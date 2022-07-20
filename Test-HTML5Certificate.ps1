@@ -1,4 +1,11 @@
+[CmdletBinding(DefaultParameterSetName="Regular")]
+param(
+	# Use this switch to actually set the certificate for use in RDS
+	[Parameter(ParameterSetName='SetCertificate',Mandatory=$false)]
+	[switch]$SetCertificate
+)
 
+$ErrorActionPreference = "Stop"
 Function CheckCertificate{
     param($certToCheck)
     $errorCount = 0
@@ -33,7 +40,11 @@ Function CheckCertificate{
         Write-Warning "This certificate doesn't appear to match the hostname of the machine. This certificate can't be used"
     }
 
-    $errorCount
+    if($errorCount -gt 0){
+        Write-Error "This certificate can't currently be used - please review the warning messages above"
+    } else{
+        Write-Host "This certificate passed the checks and looks ready to use."
+    }
 }
 
 
@@ -41,3 +52,17 @@ Function CheckCertificate{
 
 $selectedCert = Get-ChildItem Cert:\LocalMachine\My | Select-Object -Property * | Out-GridView -PassThru -Title "Select the certificate to use for PSM"
 CheckCertificate $selectedCert
+
+if($SetCertificate){
+    # This won't run if errorCount is greater than 0, as that generates an Error and will end execution
+    $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+    if(!$currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){
+        Write-Error "Will not attempt to set the certificate. Must be running as administrator to update the RDS certificate"
+    }
+
+    Write-Host "Attempting to set certificate for use in RDS.."
+    $tsgs = Get-WmiObject -class "Win32_TSGeneralSetting" -Namespace root\cimv2\terminalservices -Filter "TerminalName='RDP-tcp'"
+    $thumb = $selectedCert.Thumbprint
+    $thumb
+    Set-WMIInstance -path $tsgs.__path -argument @{SSLCertificateSHA1Hash="$thumb"}
+}
