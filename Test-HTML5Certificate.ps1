@@ -63,6 +63,5 @@ if($SetCertificate){
     Write-Host "Attempting to set certificate for use in RDS.."
     $tsgs = Get-WmiObject -class "Win32_TSGeneralSetting" -Namespace root\cimv2\terminalservices -Filter "TerminalName='RDP-tcp'"
     $thumb = $selectedCert.Thumbprint
-    $thumb
     Set-WMIInstance -path $tsgs.__path -argument @{SSLCertificateSHA1Hash="$thumb"}
 }
